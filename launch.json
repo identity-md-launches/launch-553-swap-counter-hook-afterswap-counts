@@ -1,0 +1,21 @@
+{
+  "kind": "univ4_hook",
+  "hook": {
+    "contract": "SwapCounterHook",
+    "constructorArgs": ["$poolManager"],
+    "permissions": ["afterInitialize", "afterSwap"]
+  },
+  "token": {
+    "contract": "SwapCounterToken",
+    "name": "Swap Counter",
+    "symbol": "SWPC",
+    "decimals": 18
+  },
+  "pool": {
+    "pairedCurrency": "0x0000000000000000000000000000000000000000",
+    "fee": 3000,
+    "tickSpacing": 60,
+    "initialPrice": "79228162514264337593543950336"
+  },
+  "notes": "SwapCounterHook (src/SwapCounterHook.sol) is a swap-counter hook implemented directly on v4-core's IHooks. getHookPermissions() enables exactly afterInitialize and afterSwap; the other twelve flags are false, including every *ReturnDelta flag. The constructor takes one argument, the chain's IPoolManager, written here as $poolManager for the deployer to resolve; it rejects the zero address and runs Hooks.validateHookPermissions, so the deployed address must carry the AFTER_INITIALIZE | AFTER_SWAP bits (0x1040, decimal 4160) in its low 14 bits or deployment reverts with HookAddressNotValid. The salt is mined per deployer and init code (src/HookAddressMiner.sol does this on chain; script/Deploy.s.sol uses it). afterInitialize is enabled only because an IMD launch requires an initialization callback: it is restricted to the PoolManager (NotPoolManager otherwise), changes no state, accepts any pool parameters and returns IHooks.afterInitialize.selector. afterSwap is restricted to the PoolManager, increments swapsBySender[sender] and totalSwaps, emits one SwapCounted(poolId, sender, senderSwapCount, totalSwapCount, zeroForOne, amountSpecified, delta) event per swap and returns (afterSwap.selector, 0). It never changes amounts, never overrides the LP fee and never holds tokens; the tests compare every swap's BalanceDelta against an identical hook-less pool. sender is the address that called PoolManager.swap (a router), not the end user, so the per-sender counter counts per router; the counters aggregate across every pool that uses the hook and the event carries the PoolId for per-pool indexing. The twelve disabled callbacks revert with HookNotImplemented for everyone. Views: poolManager(), totalSwaps(), swapsBySender(address), swapCount(address) (same as swapsBySender), getHookPermissions(). There is no owner, admin function, pause, upgrade, DELEGATECALL, CALLCODE or SELFDESTRUCT. SwapCounterToken (src/SwapCounterToken.sol) is OpenZeppelin ERC20 5.7.0 with no constructor arguments: name Swap Counter, symbol SWPC, 18 decimals, TOTAL_SUPPLY of 1e27 minted once to msg.sender in the constructor; no mint, burn, owner, pause, blocklist, fee or proxy. Pool: the token paired with native ETH (pairedCurrency is the zero address, so ETH is currency0 and SWPC is currency1), static LP fee 3000 (0.30%), tick spacing 60, initialPrice 79228162514264337593543950336 = 2^96, i.e. a 1:1 sqrtPriceX96 (tick 0), the price the repository's tests initialize with; the hook enforces no fee, tick spacing or price constraint, so the launch policy may adjust the pool fields without touching the contracts. Toolchain: solc 0.8.26 (v4-core's pin), optimizer 200 runs, evm_version cancun (the PoolManager uses transient storage), via_ir off, bytecode_hash none. ABIs are exported at docs/abi/SwapCounterHook.json and docs/abi/SwapCounterToken.json. Supply, allocations, owners, chain and gas limits are not manifest fields and come from the separately versioned launch policy."
+}
